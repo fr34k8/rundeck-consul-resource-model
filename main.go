@@ -46,14 +46,6 @@ func main() {
 		serviceNames = append(serviceNames, arg)
 	}
 
-	if len(serviceNames) < 1 {
-		fmt.Fprintf(
-			os.Stderr, "Usage: %s [options] service-names...\n", os.Args[0],
-		)
-		fmt.Fprintf(os.Stderr, "\n")
-		os.Exit(1)
-	}
-
 	if consulAddr == "" {
 		consulAddr = "127.0.0.1:8500"
 	}
@@ -102,6 +94,17 @@ func Generate(config *consul.Config, serviceNames []string, oneOffTags map[strin
 	project := &Project{}
 
 	options := &consul.QueryOptions{}
+
+	if len(serviceNames) == 0 {
+		services, _, err := catalog.Services(options)
+		if nil != err {
+			return err
+		}
+		for service, _ := range services {
+			serviceNames = append(serviceNames, service)
+		}
+	}
+
 	for _, dc := range datacenters {
 		options.Datacenter = dc
 		addressTags := make(map[string]map[string]bool)
