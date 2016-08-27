@@ -9,6 +9,7 @@ import (
 	"time"
 
 	consul "github.com/hashicorp/consul/api"
+	"github.com/namsral/flag"
 )
 
 type Project struct {
@@ -29,37 +30,25 @@ func main() {
 
 	serviceNames := make([]string, 0, len(os.Args)-1)
 	oneOffTags := make(map[string]string)
-	consulAddr := os.Getenv("CONSUL_ADDRESS")
-	consulScheme := os.Getenv("CONSUL_SCHEME")
-	consulToken := os.Getenv("CONSUL_TOKEN")
 
-	noMoreOptions := false
-	for _, arg := range os.Args[1:] {
-		if !noMoreOptions {
-			if strings.HasPrefix(arg, "--tag-one=") {
-				tagOneVal := arg[10:]
-				parts := strings.SplitN(tagOneVal, ":", 2)
-				oneOffTags[parts[0]] = parts[1]
-				continue
-			} else if arg == "--" {
-				noMoreOptions = true
-				continue
-			} else if strings.HasPrefix(arg, "-") {
-				fmt.Fprintf(os.Stderr, "Unknown option %s\n", arg)
-				os.Exit(1)
-			}
-		}
+	var consulAddr string
+	var consulScheme string
+	var consulToken string
+	var consulAuth string
 
+	flag.StringVar(&consulAddr, "consul_address", "127.0.0.1:3500", "consul address")
+	flag.StringVar(&consulScheme, "consul_scheme", "http", "http or https")
+	flag.StringVar(&consulToken, "consul_token", "", "ACL token")
+	flag.StringVar(&consulAuth, "consul_auth", "", "basic auth e.g user:password")
+	flag.Parse()
+
+	for _, arg := range flag.Args() {
 		serviceNames = append(serviceNames, arg)
 	}
 
 	if len(serviceNames) < 1 {
 		fmt.Fprintf(
 			os.Stderr, "Usage: %s [options] service-names...\n", os.Args[0],
-		)
-		fmt.Fprintf(os.Stderr, "\nOptions:\n")
-		fmt.Fprintf(
-			os.Stderr, "  --tag-one=service:tagname\n",
 		)
 		fmt.Fprintf(os.Stderr, "\n")
 		os.Exit(1)
@@ -76,6 +65,16 @@ func main() {
 		Address: consulAddr,
 		Scheme:  consulScheme,
 		Token:   consulToken,
+	}
+
+	if consulAuth != "" {
+		authStrings := strings.Split(consulAuth, ":")
+		if len(authStrings) > 1 {
+			config.HttpAuth = &consul.HttpBasicAuth{
+				Username: authStrings[0],
+				Password: authStrings[1],
+			}
+		}
 	}
 
 	now := time.Now()
